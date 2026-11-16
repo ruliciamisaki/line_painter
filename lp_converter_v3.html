@@ -224,6 +224,14 @@
 	<div class="controls" style="margin-top:14px">
 		<button class="primary" id="bSave">picture_v3.js を保存</button>
 		<button id="bCopy">データをコピー</button>
+		<button id="bGif">GIF アニメで保存</button>
+		<span>GIF の大きさ</span>
+		<select id="gifZoom" title="縦長ドット（640×200）は、縦を 2 倍にして見た目どおりの縦横比で出します">
+			<option value="0" selected>自動</option><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option>
+		</select>
+		<span>コマ</span>
+		<select id="gifFps"><option value="10">10 / 秒</option><option value="20" selected>20 / 秒</option><option value="25">25 / 秒</option><option value="50">50 / 秒</option></select>
+		<span id="gifStatus" class="hint"></span>
 	</div>
 	<textarea id="out" readonly placeholder="変換すると、ここに絵データが出ます"></textarea>
 </section>
@@ -231,6 +239,7 @@
 
 <script src="lp_engine_v3.js"></script>
 <script src="lp_convert_v3.js"></script>
+<script src="lp_gif_v3.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -479,6 +488,31 @@ $('bSave').onclick = () => {
 	a.download = 'picture_v3.js';
 	a.click();
 	setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+// 描画の様子を GIF アニメにする。速さは上の「速さ」、見せ方は絵データの指定どおり
+let gifBusy = false;
+$('bGif').onclick = async () => {
+	if (!result || gifBusy) return;
+	gifBusy = true; $('bGif').disabled = true;
+	const pic = result.picture, speed = +$('speed').value;
+	// 自動: 横 320 ドット未満の絵は 2 倍にする
+	const zoom = +$('gifZoom').value || (pic.width < 320 ? 2 : 1);
+	const t0 = performance.now();
+	try {
+		const bytes = await LP3.makeGif(pic, {
+			speed, fps: +$('gifFps').value, zoom,
+			onProgress: r => { $('gifStatus').textContent = `GIF を作成中… ${Math.round(r * 100)}%`; },
+		});
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([bytes], { type: 'image/gif' }));
+		a.download = 'picture_v3.gif';
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+		const w = pic.width * zoom, h = pic.height * Math.round(pic.pixelAspect || 1) * zoom;
+		$('gifStatus').textContent = `GIF ${w}×${h}・${(bytes.length / 1024).toFixed(0)}KB（×${speed}、${((performance.now() - t0) / 1000).toFixed(1)} 秒で作成）`;
+	} catch (err) {
+		console.error(err); $('gifStatus').textContent = 'GIF を作れませんでした: ' + err.message;
+	} finally { gifBusy = false; $('bGif').disabled = false; }
 };
 $('bCopy').onclick = async () => {
 	if (!result) return;

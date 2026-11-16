@@ -8,7 +8,8 @@ Chromium 上で lp_converter_v3.html を実際に動かし、設定の組み合�
   - 容量指定に届いたと報告したとき、実際の容量が上限以下
   - 「減色のみの絵」との差が上限以内（塗りの漏れなど、大きな崩れの検出）。
     「減色のみ」を完成形にする設定では、差が厳密に 0
-  - デジタルパレットの描画モードで、通常モードと最終の画面が同じ。描いている間は黒と青しか見せず、
+  - GIF アニメの最後のコマが完成の絵と同じで、長さが「描画時間 + 2 秒」（Pillow があるときだけ）
+  - デジタルパレットの描画モードで、通常モードと最終の画面が同じ。描いている間は選んだ 2 つの見せ色しか見せず、
     最後に全部黒で待ってから既定のパレットに戻る
 
 使い方:
@@ -115,6 +116,39 @@ USED_JS = """(() => {
 })()"""
 
 
+# GIF アニメの確認（Pillow があるときだけ）:
+#   最後のコマが描き切った絵と同じか、全体の長さが「描画時間 + 2 秒」になっているか
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+GIF_JS = """(async () => {
+  const bytes = await LP3.makeGif(result.picture, { speed: 1, fps: 20, zoom: 1 });
+  let bin = ''; for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  const e = new LP3.Engine(result.picture); e.runAll();
+  const c = document.createElement('canvas'); e.blit(c);
+  return [btoa(bin), c.toDataURL()];
+})()"""
+
+
+async def check_gif(page, seconds):
+    import base64, io
+    g64, ref = await page.evaluate(GIF_JS)
+    gif = Image.open(io.BytesIO(base64.b64decode(g64)))
+    total = 0
+    for k in range(gif.n_frames):
+        gif.seek(k)
+        total += gif.info.get('duration', 0)
+    last = gif.convert('RGB')
+    want = Image.open(io.BytesIO(base64.b64decode(ref.split(',')[1]))).convert('RGB').resize(last.size, Image.NEAREST)
+    if last.tobytes() != want.tobytes():
+        return '最後のコマが完成の絵と違う'
+    if abs(total / 1000 - (seconds + 2)) > 0.15:
+        return f'長さが合わない {total / 1000:.2f} 秒（描画 {seconds:.2f} 秒 + 2 秒のはず）'
+    return ''
+
+
 async def main():
     OUT.mkdir(exist_ok=True)
     failures = []
@@ -179,6 +213,11 @@ async def main():
             print(f"{name:<20} {s['bytes'] / 1024:>6.1f}KB {s['coarse']:>5.2f} {s['segments']:>5} {s['regions']:>4} "
                   f"{str(s['flats']) + '/' + str(s['tiles']):>10} {s['redrawSegs']:>4} {s['mismatch']:>4} "
                   f"{s['idealDiff'] * 100:>5.1f}% {s['seconds']:>5.1f} {s['ms']:>5}ms{note}")
+
+            if Image is not None:
+                msg = await check_gif(page, s['seconds'])
+                if msg:
+                    failures.append(f'{name}: GIF アニメ {msg}')
 
             await page.click('#bEnd')
             await page.wait_for_timeout(150)
