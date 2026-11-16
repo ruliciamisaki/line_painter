@@ -368,6 +368,14 @@
 		}
 
 		// 全体の所要時間（秒、speed = 1 のとき）
+		// デジタルパレットで描いたとき、見せる色番号を切り替える回数（最初の 1 回は数えない）
+		static countSwitches(pic) {
+			const e = new Engine(pic, 'palette');
+			let n = -1, last = -1;
+			for (const _ of e.run()) { if (e.active >= 0 && e.active !== last) { n++; last = e.active; } }
+			return Math.max(0, n);
+		}
+
 		static duration(pic, mode) {
 			const e = new Engine(pic, mode);
 			let L = 0, P = 0, Wt = 0;

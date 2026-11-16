@@ -159,6 +159,13 @@
 					<option value="staged">ベタを全部 → タイルを全部</option>
 				</select>
 			</label>
+			<label class="row two">色番号の切り替え
+				<select id="paintGroup">
+					<option value="size">従来式（大きい領域から塗る）</option>
+					<option value="color">まとめ式（同じ色番号をまとめて塗る）</option>
+				</select>
+			</label>
+			<p class="hint">まとめ式は、同じ色番号で塗る領域を続けて塗ります。デジタルパレットで、色番号を切り替える回数が減ります。完成の絵は同じです。</p>
 			<label class="check"><input type="checkbox" id="bgLast" checked> 背景を最後に塗る</label>
 		</div>
 	</fieldset>
@@ -315,7 +322,7 @@ function options() {
 		lineThreshold: +$('lthr').value, lineDark: +$('ldark').value, lineMinLen: +$('lmin').value,
 		lineTexture: $('ltex').checked, lineGap: +$('lgap').value, lineColor: +$('lcolor').value,
 		strokeEps: +$('eps').value, toneLevels: +$('tone').value,
-		paintOrder: $('order').value, bgLast: $('bgLast').checked, pack: $('pack').checked, drawMode: $('drawMode').value,
+		paintOrder: $('order').value, paintGroup: $('paintGroup').value, bgLast: $('bgLast').checked, pack: $('pack').checked, drawMode: $('drawMode').value,
 		palColors: palColors.slice(),
 		goalIdeal: $('goalIdeal').checked,
 		adjust: { r: +$('aR').value, g: +$('aG').value, b: +$('aB').value, sat: +$('aSat').value, bright: +$('aBright').value, contrast: +$('aCont').value },
@@ -403,6 +410,7 @@ function convert() {
 		<tr><td>工程4 引き直し</td><td>${s.redrawSegs || s.fixDots ? [s.redrawSegs ? `線分 ${s.redrawSegs} 本` : '', s.fixDots ? `仕上げの修正 ${s.fixDots} ドット（線分 ${s.fixSegs} 本）` : ''].filter(Boolean).join(' ＋ ') : 'なし'}</td></tr>
 		<tr><td>${s.sketch ? '背景の色 / 線の色' : '紙の色 / 主線の色'}</td><td>${sw(s.clear)}　/　${sw(s.lineColor)}</td></tr>
 		<tr><td>使う色</td><td>${s.colors.map(sw).join('　')}</td></tr>
+		<tr><td>色番号の切り替え</td><td>${s.switches} 回（デジタルパレットで見せる色番号が替わる回数）</td></tr>
 		<tr><td>描画時間</td><td>${s.seconds.toFixed(1)} 秒（×1 のとき${result.picture.drawMode === 'palette' ? '。絵を現す前の待ち 0.5 秒を含む' : ''}）</td></tr>
 		<tr><td>検証のずれ</td><td>${mis}</td></tr>
 		<tr><td>減色のみとの差</td><td>${s.idealDiff === 0 ? '<span class="ok">0（完全一致）</span>' : (s.idealDiff * 100).toFixed(1) + ' %（線の間引きや縁の色による違い）'}</td></tr>

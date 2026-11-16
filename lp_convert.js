@@ -969,7 +969,7 @@
 	//   width, height, aspect, fit, paletteKey, colors, clearColor(-1 自動), bgColor(-1 自動),
 	//   deDither, smoothIters, sigmaR, penalty, minArea, edgeSmooth,
 	//   useLines, lineMethod, lineRadius, lineThreshold, lineDark, lineMinLen, lineTexture, lineGap, lineColor(-1 自動),
-	//   strokeEps, toneLevels, paintOrder('each'|'staged'), bgLast, pack, drawMode('normal'|'palette'), palColors（palette の見せ色 [描いている色, それ以外の色]）,
+	//   strokeEps, toneLevels, paintOrder('each'|'staged'), paintGroup('size'|'color'), bgLast, pack, drawMode('normal'|'palette'), palColors（palette の見せ色 [描いている色, それ以外の色]）,
 	//   goalIdeal（「減色のみ」の絵を完成形にする）,
 	//   adjust: { r, g, b, sat, bright, contrast }（原画の色補正。-100〜100）,
 	//   budgetKB(0 で上限なし), coarse(0〜1)
@@ -1397,11 +1397,33 @@
 			};
 			const flatOf = reg => { flatCount++; pushPaint(2, [[reg.flat]], reg.rej, reg.seed); };
 			const tileOf = reg => { tileCount++; pushPaint(3, [[reg.c.a, reg.c.b], [reg.c.b, reg.c.a]], reg.rej, reg.seed); };
-			if (opt.paintOrder === 'staged') {
-				for (const reg of sorted) if (reg.flat >= 0) flatOf(reg);
-				for (const reg of sorted) if (reg.tile) tileOf(reg);
+			const staged = opt.paintOrder === 'staged';
+			// まとめ式: 同じ色番号で塗るものを続けて塗り、色番号の切り替えを減らす。
+			// 領域どうしは線で仕切られているので、塗る順番を入れ替えても完成の絵は変わらない
+			// （同じ領域のベタ → タイルの順だけは守る）。
+			// 「色番号」は、デジタルパレットで見せる色番号（エンジンの activate と同じ決め方）:
+			//   ベタはその色。タイルは、直前が同じ領域のベタならその色、そうでなければ紙の色でない方。
+			// 組の順番: 工程 1 の最後の線と同じ色番号の組を最初に（切り替えが 1 回減る）、
+			// あとは面積の合計が大きい順。背景を最後に塗る設定なら、背景のある組を最後にする。
+			const byColor = (list, keyOf) => {
+				if (opt.paintGroup !== 'color') return list;
+				const gs = new Map();
+				for (const reg of list) {
+					const k = keyOf(reg);
+					if (!gs.has(k)) gs.set(k, { k, list: [], total: 0, hasBg: false });
+					const g = gs.get(k);
+					g.list.push(reg); g.total += reg.size; if (reg === bg) g.hasBg = true;
+				}
+				const first = penPolys.length ? penPolys[penPolys.length - 1].color : -1;
+				const rank = g => (g.hasBg ? 2 : g.k === first ? 0 : 1);
+				return [...gs.values()].sort((a, b) => rank(a) - rank(b) || b.total - a.total).flatMap(g => g.list);
+			};
+			const tileKey = reg => (reg.c.a === clear ? reg.c.b : reg.c.a);
+			if (staged) {
+				for (const reg of byColor(sorted.filter(r => r.flat >= 0), r => r.flat)) flatOf(reg);
+				for (const reg of byColor(sorted.filter(r => r.tile), tileKey)) tileOf(reg);
 			} else {
-				for (const reg of sorted) {
+				for (const reg of byColor(sorted.filter(r => r.flat >= 0 || r.tile), r => (r.flat >= 0 ? r.flat : tileKey(r)))) {
 					if (reg.flat >= 0) flatOf(reg);
 					if (reg.tile) tileOf(reg);
 				}
@@ -1564,6 +1586,7 @@
 				...best.counts, bytes: best.bytes, mismatch: v.bad,
 				idealDiff: diff / best.target.length,
 				seconds: LP3.Engine.duration(best.pic),
+				switches: LP3.Engine.countSwitches(best.pic),
 				clear: prep.clear, lineColor: prep.lineColor, colors: prep.sel.slice(), sketch: prep.sketch,
 				coarse: best.s, budgetKB: opt.budgetKB || 0, budgetOk, tries,
 				ms: Math.round(performance.now() - t0),

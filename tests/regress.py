@@ -8,6 +8,7 @@ Chromium 上で lp_converter.html を実際に動かし、設定の組み合わ�
   - 容量指定に届いたと報告したとき、実際の容量が上限以下
   - 「減色のみの絵」との差が上限以内（塗りの漏れなど、大きな崩れの検出）。
     「減色のみ」を完成形にする設定では、差が厳密に 0
+  - まとめ式（同じ色番号をまとめて塗る）で、従来式と完成の絵が同じで、色番号の切り替えが減っている
   - GIF アニメの最後のコマが完成の絵と同じで、長さが「描画時間 + 2 秒」（Pillow があるときだけ）
   - デジタルパレットの描画モードで、通常モードと最終の画面が同じ。描いている間は選んだ 2 つの見せ色しか見せず、
     最後に全部黒で待ってから既定のパレットに戻る
@@ -61,6 +62,11 @@ CASES = [
     ('パレット 白と赤',     'main_js.png', '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'; palColors=['#ffffff','#ff0000']; refreshPalPick()", 0, 0.03),
     ('パレット DB8 緑と青', 'main_js.png', '640x200x2', 'db8',      ALL, "$('drawMode').value='palette'; palColors=['#00ff00','#0000ff']; refreshPalPick()", 0, 0.04),
     ('パレット 線画',       'main_js.png', '640x200x2', 'digital8', [7], "$('drawMode').value='palette'", 0, 1),
+    # まとめ式（同じ色番号をまとめて塗る）。色番号の切り替えが 20 回以下になること
+    ('まとめ式',            'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('drawMode').value='palette'", 0, 0.03),
+    ('まとめ式 ベタ全部→',  'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('order').value='staged'", 0, 0.03),
+    ('まとめ式 写真 DB8',   'photo.png',   '640x200x2', 'db8',      ALL, "$('paintGroup').value='color'; $('drawMode').value='palette'", 0, 0.06),
+    ('まとめ式 減色のみ',   'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('goalIdeal').checked=true", 0, 0),
     # 「減色のみ」の絵を完成形にする（差は厳密に 0 でなければならない）
     ('減色のみを完成形',    'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true", 0, 0),
     ('減色のみ 主線なし',   'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true; $('useLines').checked=false", 0, 0),
@@ -78,7 +84,7 @@ CASES = [
 RESET_JS = """(() => {
   $('useLines').checked = true; $('eps').value = '0.7'; $('order').value = 'each'; $('pack').checked = true;
   $('lmethod').value = 'dark'; $('bgLast').checked = true; $('coarse').value = '0';
-  $('drawMode').value = 'normal'; $('goalIdeal').checked = false;
+  $('drawMode').value = 'normal'; $('goalIdeal').checked = false; $('paintGroup').value = 'size';
   palColors = LP3.PAL_DEFAULT.slice(); refreshPalPick();
   document.querySelectorAll('input.adj').forEach(e => { e.value = 0; });
 })()"""
@@ -115,6 +121,15 @@ USED_JS = """(() => {
   return { pen: [...pen], paint: [...paint], stages: result.picture.ops.filter(o => o[0] === 'S').map(o => o[1]) };
 })()"""
 
+
+# まとめ式の確認: 同じ設定を従来式で変換して、完成の絵（色番号）が同じかと、従来式の切り替え回数を返す
+GROUP_JS = """(() => {
+  const a = new LP3.Engine(result.picture, 'normal').runAll();
+  const r = LP3.convert.run(srcImg, Object.assign(options(), { paintGroup: 'size' }));
+  const b = new LP3.Engine(r.picture, 'normal').runAll();
+  let same = a.length === b.length; for (let i = 0; same && i < a.length; i++) if (a[i] !== b[i]) same = false;
+  return { same, switches: r.stats.switches };
+})()"""
 
 # GIF アニメの確認（Pillow があるときだけ）:
 #   最後のコマが描き切った絵と同じか、全体の長さが「描画時間 + 2 秒」になっているか
@@ -202,6 +217,11 @@ async def main():
                 failures.append(f"{name}: 容量超過 {s['bytes']} > {kb * 1024}")
             if s['idealDiff'] > max_diff:
                 failures.append(f"{name}: 減色のみとの差が大きい {s['idealDiff'] * 100:.2f}% > {max_diff * 100:.0f}%")
+            if "paintGroup" in extra:
+                # 従来式で変換し直して、完成の絵が同じで、切り替えが減っていることを確かめる
+                g = await page.evaluate(GROUP_JS)
+                if not g['same'] or s['switches'] > 20 or s['switches'] >= g['switches']:
+                    failures.append(f"{name}: まとめ式の確認に失敗 切り替え {s['switches']} 回（従来式 {g['switches']} 回）、絵が同じ={g['same']}")
             if 'palette' in extra:
                 pm = await page.evaluate(PALETTE_JS)
                 if pm['mode'] != 'palette' or pm['d'] or pm['bad'] or not pm['fin'] or not pm['blank'] or not pm['cols']:
