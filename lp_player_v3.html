@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ラインペイント再生 V3</title>
+<style>
+	body { background: #f0f0f0; color: #222; text-align: center; margin: 0; padding: 20px 12px; font-family: "BIZ UDPGothic", "Yu Gothic UI", sans-serif; }
+	h1 { font-size: 20px; margin: 0 0 12px; }
+	.frame { display: inline-block; max-width: 100%; overflow: auto; border: 1px solid #ccc; background: #fff; }
+	canvas { image-rendering: pixelated; display: block; }
+	.bar { margin: 10px; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+	.steps { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+	.steps span { padding: 3px 10px; border: 1px solid #bbb; border-radius: 999px; color: #777; font-size: 13px; }
+	.steps span.on { color: #fff; background: #2f6fd0; border-color: #2f6fd0; font-weight: bold; }
+	#msg { color: #a33; }
+</style>
+</head>
+<body>
+	<h1>ラインペイント</h1>
+	<div class="frame"><canvas id="cv"></canvas></div>
+	<div class="steps" id="steps">
+		<span data-s="1">1 線を引く</span><span data-s="2">2 ベタ塗り</span><span data-s="3">3 タイル塗り</span><span data-s="4">4 線の引き直し</span>
+	</div>
+	<div class="bar">
+		<button id="bPlay">一時停止</button>
+		<button id="bRestart">最初から</button>
+		<span>速さ</span>
+		<select id="speed">
+			<option value="0.25">×0.25</option><option value="0.5">×0.5</option>
+			<option value="1" selected>×1（元の速さ）</option>
+			<option value="2">×2</option><option value="4">×4</option><option value="8">×8</option><option value="16">×16</option>
+		</select>
+		<span>拡大</span><select id="zoom"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+		<span>見せ方</span>
+		<select id="mode">
+			<option value="">絵データの指定どおり</option>
+			<option value="normal">通常</option>
+			<option value="palette">デジタルパレット</option>
+		</select>
+		<label>別の絵: <input type="file" id="file" accept=".js,.json"></label>
+	</div>
+	<div id="msg"></div>
+
+	<script src="lp_engine_v3.js"></script>
+	<script src="picture_v3.js"></script>
+	<script>
+	'use strict';
+	const $ = id => document.getElementById(id), cv = $('cv');
+	let pic = window.LP_PICTURE || null, eng = null, playing = true, lastT = 0;
+	if (!pic) $('msg').textContent = 'picture_v3.js が見つかりません。「別の絵」から絵データを選んでください。';
+
+	function restart() {
+		if (!pic) return;
+		eng = new LP3.Engine(pic, $('mode').value || undefined);
+		eng.start();
+		playing = true; lastT = 0;
+		$('bPlay').textContent = '一時停止';
+		resize(); eng.blit(cv);
+	}
+	function resize() { if (pic) LP3.setDisplaySize(cv, pic.width, pic.height, pic.pixelAspect || 1, +$('zoom').value); }
+	function loop(t) {
+		if (eng && playing && !eng.done) {
+			eng.advance(lastT ? Math.min(50, t - lastT) : 16.7, +$('speed').value);
+			eng.blit(cv);
+		}
+		const stage = eng && !eng.done ? eng.stage : 0;
+		document.querySelectorAll('#steps span').forEach(e => e.classList.toggle('on', +e.dataset.s === stage));
+		lastT = t;
+		requestAnimationFrame(loop);
+	}
+	$('bPlay').onclick = () => { playing = !playing; $('bPlay').textContent = playing ? '一時停止' : '再生'; };
+	$('bRestart').onclick = restart;
+	$('zoom').onchange = resize;
+	$('mode').onchange = restart;
+	$('file').onchange = async e => {
+		const f = e.target.files[0]; if (!f) return;
+		try { pic = LP3.parsePicture(await f.text()); $('msg').textContent = ''; restart(); }
+		catch (err) { $('msg').textContent = '読み込めませんでした: ' + err.message; }
+	};
+	restart();
+	requestAnimationFrame(loop);
+	</script>
+</body>
+</html>

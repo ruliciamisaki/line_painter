@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ラインペイント変換 V3</title>
+<style>
+	:root {
+		--bg: #15161b; --panel: #1e2027; --line: #30333d; --text: #e4e6ec; --dim: #8b90a0;
+		--accent: #7fb4ff; --warn: #ffb070; --ok: #8fd694;
+	}
+	* { box-sizing: border-box; }
+	body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 "BIZ UDPGothic", "Yu Gothic UI", "Hiragino Sans", sans-serif; }
+	header { padding: 12px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+	header h1 { margin: 0; font-size: 16px; letter-spacing: .05em; }
+	header span { color: var(--dim); }
+	main { display: grid; grid-template-columns: 310px 1fr; min-height: calc(100vh - 49px); }
+	aside { background: var(--panel); border-right: 1px solid var(--line); padding: 12px 14px; overflow-y: auto; }
+	fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 8px 10px 10px; min-width: 0; }
+	legend { color: var(--accent); padding: 0 4px; font-weight: bold; }
+	label.row { display: grid; grid-template-columns: 104px 1fr 38px; align-items: center; gap: 6px; margin: 5px 0; }
+	label.row.two { grid-template-columns: 104px 1fr; }
+	label.check { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+	label.row output { color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
+	select, input[type=number] { background: #111217; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font: inherit; width: 100%; min-width: 0; }
+	input[type=range] { width: 100%; accent-color: var(--accent); min-width: 0; }
+	.inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	.inline input[type=number] { width: 70px; }
+	button { background: #2a2e39; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; font: inherit; cursor: pointer; }
+	button:hover { border-color: var(--accent); }
+	button.primary { background: #2f4f7f; border-color: #3f6aa8; }
+	.hint { color: var(--dim); font-size: 12px; margin: 3px 0 0; }
+	.note { color: var(--warn); font-size: 12px; margin: 4px 0; }
+	#drop { border: 1px dashed var(--line); border-radius: 6px; padding: 14px; text-align: center; color: var(--dim); cursor: pointer; }
+	#drop.over { border-color: var(--accent); color: var(--accent); }
+	section.view { padding: 12px 18px; overflow: auto; min-width: 0; }
+	.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+	.tabs button.on { background: #2f4f7f; border-color: #3f6aa8; }
+	.stage { background: #0c0d10; border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: inline-block; max-width: 100%; overflow: auto; }
+	canvas { image-rendering: pixelated; display: block; }
+	.controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+	.controls select { width: auto; }
+	.steps { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0 0; }
+	.steps span { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--dim); }
+	.steps span.on { color: #10131a; background: var(--accent); border-color: var(--accent); font-weight: bold; }
+	table.stats { border-collapse: collapse; margin-top: 6px; }
+	table.stats td { padding: 2px 12px 2px 0; vertical-align: top; }
+	table.stats td:first-child { color: var(--dim); white-space: nowrap; }
+	.ok { color: var(--ok); } .warn { color: var(--warn); }
+	#status { color: var(--dim); margin-left: 8px; }
+	textarea { width: 100%; height: 110px; background: #0c0d10; color: var(--dim); border: 1px solid var(--line); border-radius: 6px; font: 11px/1.4 Consolas, monospace; padding: 6px; resize: vertical; }
+	.swatches { display: flex; gap: 5px; margin: 6px 0 4px; flex-wrap: wrap; }
+	.swatches i { width: 26px; height: 22px; border: 1px solid #0006; border-radius: 4px; display: block; cursor: pointer; position: relative; outline-offset: 1px; }
+	.swatches i.on { outline: 2px solid var(--accent); }
+	.swatches i.off { opacity: .22; }
+	.swatches i.off::after { content: "×"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-style: normal; font-weight: bold; text-shadow: 0 0 2px #000; }
+	.palpick { font-size: 13px; margin: 4px 0 0; }
+	.palpick .swatches { margin: 2px 0 4px; }
+	.sw { display: inline-block; width: 12px; height: 10px; border: 1px solid #0006; vertical-align: -1px; }
+	@media (max-width: 780px) { main { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+	<h1>ラインペイント変換 V3</h1>
+	<span>線を引く → ベタ塗り → タイル塗り → 線の引き直し</span>
+</header>
+<main>
+<aside>
+	<fieldset>
+		<legend>画像</legend>
+		<div id="drop">ここへ画像をドロップ<br>またはクリックして選択</div>
+		<input type="file" id="file" accept="image/*" hidden>
+	</fieldset>
+
+	<fieldset>
+		<legend>原画の色補正</legend>
+		<label class="row">赤 (R)<input type="range" class="adj" id="aR" min="-100" max="100" step="1" value="0"><output></output></label>
+		<label class="row">緑 (G)<input type="range" class="adj" id="aG" min="-100" max="100" step="1" value="0"><output></output></label>
+		<label class="row">青 (B)<input type="range" class="adj" id="aB" min="-100" max="100" step="1" value="0"><output></output></label>
+		<label class="row">彩度<input type="range" class="adj" id="aSat" min="-100" max="100" step="1" value="0"><output></output></label>
+		<label class="row">明るさ<input type="range" class="adj" id="aBright" min="-100" max="100" step="1" value="0"><output></output></label>
+		<label class="row">コントラスト<input type="range" class="adj" id="aCont" min="-100" max="100" step="1" value="0"><output></output></label>
+		<div class="inline" style="margin-top:4px"><button type="button" id="bAdjReset">補正を戻す</button></div>
+		<p class="hint">動かしている間は、色の割り当てだけの下書きをすぐ表示します。手を止めると正式に変換し、完成の絵に差し替えます（再生は「最初から」で見られます）。補正後の原画は「元画像」タブで確認できます。</p>
+	</fieldset>
+
+	<fieldset>
+		<legend>画面</legend>
+		<label class="row two">解像度
+			<select id="res">
+				<option value="640x200x2">640×200（縦長ドット・16:10）</option>
+				<option value="160x144x1">160×144（正方形ドット）</option>
+				<option value="custom">任意（正方形ドット）</option>
+			</select>
+		</label>
+		<div class="inline" id="customBox" style="display:none; margin:4px 0 4px 110px">
+			<input type="number" id="cw" value="320" min="8" max="1280">×<input type="number" id="ch" value="200" min="8" max="1024">
+		</div>
+		<label class="row two">合わせ方
+			<select id="fit">
+				<option value="cover">中央で切り抜き</option>
+				<option value="contain">全体を収める（余白は白）</option>
+				<option value="stretch">引き伸ばす</option>
+			</select>
+		</label>
+		<label class="row two">パレット
+			<select id="pal">
+				<option value="digital8">デジタル8色</option>
+				<option value="db8">DB8 (DawnBringer)</option>
+			</select>
+		</label>
+		<div style="margin-top:8px">使う色 <span id="colorCount" style="color:var(--dim)"></span></div>
+		<div class="swatches" id="swatches"></div>
+		<div class="inline" style="margin:4px 0">
+			<button type="button" id="bAll">全色</button>
+			<button type="button" id="bBW">白黒</button>
+		</div>
+		<p class="note" id="sketchNote">1色なので、線だけの線画で描きます。</p>
+		<label class="row two" id="rowClear"><span id="clearLabel">紙の色</span><select id="clearColor"></select></label>
+		<p class="hint">紙の色は、描き始めの画面の色です。自動では、使う色でいちばん明るい色になります。</p>
+	</fieldset>
+
+	<fieldset>
+		<legend>線</legend>
+		<label class="check" id="rowUseLines"><input type="checkbox" id="useLines" checked> 主線（暗い線）を抽出する</label>
+		<div id="lineBox">
+			<label class="row two">抽出方法
+				<select id="lmethod">
+					<option value="dark">暗い線（イラスト向け）</option>
+					<option value="edge">明暗の段差（写真向け）</option>
+				</select>
+			</label>
+			<label class="row">線の太さ上限<input type="range" id="lrad" min="1" max="4" step="1" value="2"><output></output></label>
+			<label class="row">しきい値<input type="range" id="lthr" min="0.02" max="0.50" step="0.01" value="0.08"><output></output></label>
+			<label class="row" id="rowDark">暗さ上限<input type="range" id="ldark" min="0.1" max="1.0" step="0.05" value="0.85"><output></output></label>
+			<label class="row">最短の長さ<input type="range" id="lmin" min="1" max="60" step="1" value="8"><output></output></label>
+			<label class="row">隙間を閉じる<input type="range" id="lgap" min="0" max="20" step="1" value="4"><output></output></label>
+			<label class="check"><input type="checkbox" id="ltex" checked> 細かい模様（網点・縞）を線にしない</label>
+			<label class="row two" id="rowLcolor">主線の色<select id="lcolor"></select></label>
+		</div>
+		<label class="row">線の単純化<input type="range" id="eps" min="0" max="3" step="0.1" value="0.7"><output></output></label>
+		<p class="hint">0 でドットどおり。上げるほど頂点が減り、線が直線的になります。</p>
+		<label class="row" id="rowTone">濃淡の段数<input type="range" id="tone" min="1" max="6" step="1" value="3"><output></output></label>
+	</fieldset>
+
+	<fieldset id="fsPaint">
+		<legend>塗り</legend>
+		<label class="check"><input type="checkbox" id="dedither" checked> 細かい網点・ディザを均す</label>
+		<label class="row">平滑化<input type="range" id="smooth" min="0" max="6" step="1" value="2"><output></output></label>
+		<label class="row">色境界の感度<input type="range" id="sigma" min="0.02" max="0.30" step="0.01" value="0.08"><output></output></label>
+		<label class="row">市松の抑制<input type="range" id="pen" min="0" max="0.08" step="0.005" value="0.005"><output></output></label>
+		<label class="row">最小領域<input type="range" id="minArea" min="1" max="200" step="1" value="16"><output></output></label>
+		<label class="row">境目をならす<input type="range" id="esm" min="0" max="3" step="1" value="1"><output></output></label>
+		<div id="orderBox">
+			<label class="row two">塗る順番
+				<select id="order">
+					<option value="each">領域ごとに ベタ → タイル</option>
+					<option value="staged">ベタを全部 → タイルを全部</option>
+				</select>
+			</label>
+			<label class="check"><input type="checkbox" id="bgLast" checked> 背景を最後に塗る</label>
+		</div>
+	</fieldset>
+
+	<fieldset>
+		<legend>仕上げと見せ方</legend>
+		<label class="check" id="rowGoal"><input type="checkbox" id="goalIdeal"> 「減色のみ」の絵を完成形にする</label>
+		<p class="hint" id="goalHint">線を引いて塗ったあと、「減色のみ」の絵と違うドットを最後に点と線で直します。データは増えます。このとき線はドットどおりに引きます（間引くと直す量が増えるため）。</p>
+		<label class="row two">見せ方
+			<select id="drawMode">
+				<option value="normal">通常</option>
+				<option value="palette">デジタルパレット</option>
+			</select>
+		</label>
+		<div id="palBox">
+			<div class="palpick">描いている色<div class="swatches" id="palDraw"></div></div>
+			<div class="palpick">それ以外の色<div class="swatches" id="palHide"></div></div>
+			<p class="hint" id="palWarn" style="color:#b33;display:none">2 色が同じなので、描いている間は何も見えません。</p>
+		</div>
+		<p class="hint">デジタルパレットは、PC-8801 のパレット切り替えの再現です。描いている色番号だけを「描いている色」、ほかを「それ以外の色」で見せ、最後に本来の色へ戻します。できあがる絵は同じです。</p>
+	</fieldset>
+
+	<fieldset>
+		<legend>データ容量</legend>
+		<label class="check"><input type="checkbox" id="budgetOn"> 上限を指定する</label>
+		<div class="inline" style="margin:4px 0 6px 24px"><input type="number" id="budget" value="5" min="1" max="2000" step="1"> KB 以下</div>
+		<label class="row">粗さ<input type="range" id="coarse" min="0" max="1" step="0.01" value="0"><output></output></label>
+		<label class="check"><input type="checkbox" id="pack" checked> 圧縮して保存する（切ると読める形で出す）</label>
+		<p class="hint">粗くすると、まず線と領域を残したまま頂点を間引いて形を多角形にし（〜0.7）、それでも足りないときだけ飾りの線を捨て、領域をまとめます。「減色のみ」を完成形にするときは、線は崩さず、領域をまとめて主線を減らします。</p>
+	</fieldset>
+</aside>
+
+<section class="view">
+	<div class="tabs" id="tabs">
+		<button data-v="play" class="on">描画再生</button>
+		<button data-v="target">完成の絵</button>
+		<button data-v="lines">線画（工程1の後）</button>
+		<button data-v="ideal">減色のみ</button>
+		<button data-v="src">元画像（縮小後）</button>
+	</div>
+	<div class="stage"><canvas id="cv"></canvas></div>
+	<div class="steps" id="steps">
+		<span data-s="1">1 線を引く</span><span data-s="2">2 ベタ塗り</span><span data-s="3">3 タイル塗り</span><span data-s="4">4 線の引き直し</span>
+	</div>
+
+	<div class="controls">
+		<button id="bPlay">⏸ 一時停止</button>
+		<button id="bRestart">⏮ 最初から</button>
+		<button id="bEnd">⏭ 最後まで</button>
+		<span>速さ</span>
+		<select id="speed">
+			<option value="0.25">×0.25</option><option value="0.5">×0.5</option>
+			<option value="1" selected>×1（元の速さ）</option>
+			<option value="2">×2</option><option value="4">×4</option><option value="8">×8</option><option value="16">×16</option>
+		</select>
+		<span>拡大</span>
+		<select id="zoom"><option value="1">×1</option><option value="2" selected>×2</option><option value="3">×3</option><option value="4">×4</option></select>
+		<span id="status"></span>
+	</div>
+
+	<table class="stats" id="stats"></table>
+
+	<div class="controls" style="margin-top:14px">
+		<button class="primary" id="bSave">picture_v3.js を保存</button>
+		<button id="bCopy">データをコピー</button>
+	</div>
+	<textarea id="out" readonly placeholder="変換すると、ここに絵データが出ます"></textarea>
+</section>
+</main>
+
+<script src="lp_engine_v3.js"></script>
+<script src="lp_convert_v3.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let srcImg = null, result = null, engine = null, playing = true, view = 'play', lastT = 0;
+const cv = $('cv');
+let selColors = [0, 1, 2, 3, 4, 5, 6, 7];
+
+document.querySelectorAll('label.row input[type=range]').forEach(r => {
+	const o = r.parentElement.querySelector('output');
+	const upd = () => { o.textContent = r.value; };
+	r.addEventListener('input', upd); upd();
+});
+
+function refreshColors() {
+	const pal = LP3.PALETTES[$('pal').value].colors;
+	const sketch = selColors.length === 1;
+	const lc = $('lcolor'), keepL = lc.value;
+	lc.innerHTML = '<option value="-1">自動（使う色でいちばん暗い色）</option>' + selColors.map(i => `<option value="${i}">${i}: ${pal[i]}</option>`).join('');
+	lc.value = keepL !== '' && selColors.includes(+keepL) ? keepL : '-1';
+	// 紙の色: ふつうは使う色から。線画（1色）のときは線の色以外のどれでも
+	const cc = $('clearColor'), keepC = cc.value;
+	const choices = sketch ? [0, 1, 2, 3, 4, 5, 6, 7].filter(i => i !== selColors[0]) : selColors;
+	cc.innerHTML = `<option value="-1">自動（${sketch ? '線の色と明るさがいちばん違う色' : 'いちばん明るい色'}）</option>` + choices.map(i => `<option value="${i}">${i}: ${pal[i]}</option>`).join('');
+	cc.value = keepC !== '' && choices.includes(+keepC) ? keepC : '-1';
+	$('clearLabel').textContent = sketch ? '背景の色' : '紙の色';
+	$('swatches').innerHTML = pal.map((c, i) => `<i data-i="${i}" class="${selColors.includes(i) ? 'on' : 'off'}" title="${i}: ${c}" style="background:${c}"></i>`).join('');
+	$('colorCount').textContent = `${selColors.length} / 8 色`;
+}
+refreshColors();
+
+$('swatches').addEventListener('click', e => {
+	const t = e.target.closest('i[data-i]'); if (!t) return;
+	const i = +t.dataset.i;
+	if (selColors.includes(i)) { if (selColors.length === 1) return; selColors = selColors.filter(c => c !== i); }
+	else selColors = [...selColors, i].sort((a, b) => a - b);
+	refreshColors(); schedule();
+});
+$('bAll').onclick = () => { selColors = [0, 1, 2, 3, 4, 5, 6, 7]; refreshColors(); schedule(); };
+$('bBW').onclick = () => {
+	const pal = LP3.PALETTES[$('pal').value].colors.map(LP3.hexToInt);
+	const lum = c => 0.2126 * ((c >> 16) & 255) + 0.7152 * ((c >> 8) & 255) + 0.0722 * (c & 255);
+	const idx = [0, 1, 2, 3, 4, 5, 6, 7].sort((a, b) => lum(pal[a]) - lum(pal[b]));
+	selColors = [idx[0], idx[7]].sort((a, b) => a - b);
+	refreshColors(); schedule();
+};
+
+// デジタルパレットの見せ色（PC-8801 のデジタル 8 色から 2 色）
+let palColors = LP3.PAL_DEFAULT.slice();
+function refreshPalPick() {
+	for (const [id, k] of [['palDraw', 0], ['palHide', 1]])
+		$(id).innerHTML = LP3.PAL_CHOICES.map(c => `<i data-c="${c}" class="${c === palColors[k] ? 'on' : ''}" title="${c}" style="background:${c}"></i>`).join('');
+	$('palWarn').style.display = palColors[0] === palColors[1] ? '' : 'none';
+}
+refreshPalPick();
+for (const [id, k] of [['palDraw', 0], ['palHide', 1]])
+	$(id).addEventListener('click', e => {
+		const t = e.target.closest('i[data-c]'); if (!t || palColors[k] === t.dataset.c) return;
+		palColors[k] = t.dataset.c; refreshPalPick(); schedule();
+	});
+
+function options() {
+	let w, h, a;
+	if ($('res').value === 'custom') { w = +$('cw').value; h = +$('ch').value; a = 1; }
+	else [w, h, a] = $('res').value.split('x').map(Number);
+	const sketch = selColors.length === 1;
+	return {
+		width: Math.max(8, Math.min(1280, w | 0)), height: Math.max(8, Math.min(1024, h | 0)), aspect: a,
+		fit: $('fit').value, paletteKey: $('pal').value, colors: selColors.slice(),
+		clearColor: sketch ? -1 : +$('clearColor').value, bgColor: sketch ? +$('clearColor').value : -1,
+		deDither: $('dedither').checked, smoothIters: +$('smooth').value, sigmaR: +$('sigma').value,
+		penalty: +$('pen').value, minArea: +$('minArea').value, edgeSmooth: +$('esm').value,
+		useLines: $('useLines').checked, lineMethod: $('lmethod').value, lineRadius: +$('lrad').value,
+		lineThreshold: +$('lthr').value, lineDark: +$('ldark').value, lineMinLen: +$('lmin').value,
+		lineTexture: $('ltex').checked, lineGap: +$('lgap').value, lineColor: +$('lcolor').value,
+		strokeEps: +$('eps').value, toneLevels: +$('tone').value,
+		paintOrder: $('order').value, bgLast: $('bgLast').checked, pack: $('pack').checked, drawMode: $('drawMode').value,
+		palColors: palColors.slice(),
+		goalIdeal: $('goalIdeal').checked,
+		adjust: { r: +$('aR').value, g: +$('aG').value, b: +$('aB').value, sat: +$('aSat').value, bright: +$('aBright').value, contrast: +$('aCont').value },
+		budgetKB: $('budgetOn').checked ? Math.max(1, +$('budget').value || 0) : 0, coarse: +$('coarse').value,
+	};
+}
+
+function updateVisibility() {
+	const sketch = selColors.length === 1;
+	const show = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+	show('sketchNote', sketch);
+	show('rowUseLines', !sketch);
+	show('lineBox', sketch || $('useLines').checked);
+	show('rowLcolor', !sketch);
+	show('rowDark', $('lmethod').value === 'dark');
+	show('rowTone', sketch);
+	show('orderBox', !sketch);
+	show('rowGoal', !sketch); show('goalHint', !sketch);
+	show('palBox', $('drawMode').value === 'palette');
+	$('customBox').style.display = $('res').value === 'custom' ? 'flex' : 'none';
+	$('eps').disabled = !sketch && $('goalIdeal').checked;
+	$('budget').disabled = !$('budgetOn').checked;
+	$('coarse').disabled = $('budgetOn').checked;
+}
+
+let timer = 0, showFinal = false;
+// quick: 色補正のスライダー用。再生をやり直さずに完成の絵を見せる
+function schedule(quick) {
+	updateVisibility();
+	clearTimeout(timer);
+	if (!srcImg) return;
+	if (quick) showFinal = true;
+	$('status').textContent = quick ? '下書きを表示中…（手を止めると正式に変換します）' : $('budgetOn').checked ? '容量を調整中…' : '変換中…';
+	timer = setTimeout(convert, quick ? 180 : 300);
+}
+// 色補正は二段構え: 動かした瞬間に下書き（色の割り当てだけ）を出し、手を止めたら正式に変換する
+function adjustChanged() {
+	if (srcImg) {
+		try {
+			const d = LP3.convert.draft(srcImg, options(), view === 'src'), z = +$('zoom').value;
+			if (view === 'src' || !d.buf) {
+				if (view === 'src') {
+					const rc = d.source();
+					cv.width = rc.width; cv.height = rc.height;
+					cv.getContext('2d').drawImage(rc, 0, 0);
+					cv.style.width = (rc.width * z) + 'px'; cv.style.height = (rc.height * z) + 'px';
+				}
+			} else {
+				cv.width = d.width; cv.height = d.height;
+				const ctx = cv.getContext('2d'), img = ctx.createImageData(d.width, d.height);
+				LP3.indexToRGBA(d.buf, d.palette.map(LP3.hexToInt), img.data);
+				ctx.putImageData(img, 0, 0);
+				LP3.setDisplaySize(cv, d.width, d.height, d.pixelAspect, z);
+			}
+			drafting = true;
+		} catch (err) { console.error(err); }
+	}
+	schedule(true);
+}
+let drafting = false;
+document.querySelectorAll('aside input.adj').forEach(e => e.addEventListener('input', adjustChanged));
+$('bAdjReset').onclick = () => {
+	document.querySelectorAll('aside input.adj').forEach(e => { e.value = 0; e.parentElement.querySelector('output').textContent = '0'; });
+	adjustChanged();
+};
+document.querySelectorAll('aside select, aside input').forEach(e => {
+	if (e.id === 'file' || e.classList.contains('adj')) return;
+	e.addEventListener(e.type === 'range' ? 'input' : 'change', () => { if (e.id === 'pal') refreshColors(); schedule(); });
+});
+updateVisibility();
+
+function convert() {
+	drafting = false;
+	try { result = LP3.convert.run(srcImg, options()); }
+	catch (err) { console.error(err); $('status').textContent = 'エラー: ' + err.message; return; }
+	const s = result.stats, pal = result.picture.palette;
+	$('status').textContent = `変換 ${s.ms} ms`;
+	if (s.budgetKB) { $('coarse').value = s.coarse.toFixed(2); $('coarse').parentElement.querySelector('output').textContent = s.coarse.toFixed(2); }
+	const sw = c => `<i class="sw" style="background:${pal[c]}"></i> ${c}`;
+	const mis = s.mismatch === 0 ? '<span class="ok">0（描画は完成の絵と完全一致）</span>' : `<span class="warn">${s.mismatch} ドット（不具合の可能性）</span>`;
+	const bud = !s.budgetKB ? '' : s.budgetOk ? `　<span class="ok">上限 ${s.budgetKB} KB 以内</span>` : `　<span class="warn">上限 ${s.budgetKB} KB に届きません（いちばん粗くしてこの大きさ）</span>`;
+	$('stats').innerHTML = `
+		<tr><td>工程1 線</td><td>ストローク ${s.strokes} 本 / 線分 ${s.segments} 本</td></tr>
+		<tr><td>工程2・3 塗り</td><td>${s.sketch ? '—（線画）' : `領域 ${s.regions} / ベタ ${s.flats} 回 / タイル ${s.tiles} 回`}</td></tr>
+		<tr><td>工程4 引き直し</td><td>${s.redrawSegs || s.fixDots ? [s.redrawSegs ? `線分 ${s.redrawSegs} 本` : '', s.fixDots ? `仕上げの修正 ${s.fixDots} ドット（線分 ${s.fixSegs} 本）` : ''].filter(Boolean).join(' ＋ ') : 'なし'}</td></tr>
+		<tr><td>${s.sketch ? '背景の色 / 線の色' : '紙の色 / 主線の色'}</td><td>${sw(s.clear)}　/　${sw(s.lineColor)}</td></tr>
+		<tr><td>使う色</td><td>${s.colors.map(sw).join('　')}</td></tr>
+		<tr><td>描画時間</td><td>${s.seconds.toFixed(1)} 秒（×1 のとき${result.picture.drawMode === 'palette' ? '。絵を現す前の待ち 0.5 秒を含む' : ''}）</td></tr>
+		<tr><td>検証のずれ</td><td>${mis}</td></tr>
+		<tr><td>減色のみとの差</td><td>${s.idealDiff === 0 ? '<span class="ok">0（完全一致）</span>' : (s.idealDiff * 100).toFixed(1) + ' %（線の間引きや縁の色による違い）'}</td></tr>
+		<tr><td>データ量</td><td>${(s.bytes / 1024).toFixed(1)} KB${bud}</td></tr>
+		<tr><td>粗さ</td><td>${s.coarse.toFixed(2)}${s.budgetKB ? `（${s.tries} 回試して決定）` : ''}</td></tr>`;
+	$('out').value = result.text.length > 200000 ? result.text.slice(0, 200000) + '\n…（長いので途中まで表示。保存すると全部入ります）' : result.text;
+	if (showFinal) {
+		// 色補正の直後は、描き終えた状態をすぐ見せる
+		showFinal = false;
+		engine = new LP3.Engine(result.picture);
+		engine.runAll();
+		draw();
+	} else restart();
+}
+
+function restart() {
+	if (!result) return;
+	engine = new LP3.Engine(result.picture);
+	engine.start();
+	playing = true; lastT = 0;
+	$('bPlay').textContent = '⏸ 一時停止';
+	draw();
+}
+
+function showIndexed(buf, pal) {
+	const p = result.picture;
+	cv.width = p.width; cv.height = p.height;
+	const ctx = cv.getContext('2d'), img = ctx.createImageData(p.width, p.height);
+	LP3.indexToRGBA(buf, pal, img.data);
+	ctx.putImageData(img, 0, 0);
+	LP3.setDisplaySize(cv, p.width, p.height, p.pixelAspect, +$('zoom').value);
+}
+
+function draw() {
+	if (!result) return;
+	const p = result.picture, z = +$('zoom').value, pal = p.palette.map(LP3.hexToInt);
+	let stage = 0;
+	if (view === 'play') {
+		engine.blit(cv);
+		LP3.setDisplaySize(cv, p.width, p.height, p.pixelAspect, z);
+		stage = engine.done ? 0 : engine.stage;
+	} else if (view === 'target') showIndexed(result.target, pal);
+	else if (view === 'ideal') showIndexed(result.ideal, pal);
+	else if (view === 'lines') {
+		const pen = result.lineView.pen, buf = new Uint8Array(pen.length);
+		for (let i = 0; i < pen.length; i++) buf[i] = pen[i] >= 0 ? pen[i] : p.clear;
+		showIndexed(buf, pal);
+	} else {
+		const rc = result.resampled;
+		cv.width = rc.width; cv.height = rc.height;
+		cv.getContext('2d').drawImage(rc, 0, 0);
+		cv.style.width = (rc.width * z) + 'px'; cv.style.height = (rc.height * z) + 'px';
+	}
+	document.querySelectorAll('#steps span').forEach(e => e.classList.toggle('on', +e.dataset.s === stage));
+}
+
+function loop(t) {
+	if (engine && playing && view === 'play' && !engine.done && !drafting) {
+		const dt = lastT ? Math.min(50, t - lastT) : 16.7;
+		engine.advance(dt, +$('speed').value);
+		draw();
+	}
+	lastT = t;
+	requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+$('tabs').addEventListener('click', e => {
+	const b = e.target.closest('button'); if (!b) return;
+	view = b.dataset.v;
+	document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+	draw();
+});
+$('zoom').addEventListener('change', draw);
+$('bPlay').onclick = () => { playing = !playing; $('bPlay').textContent = playing ? '⏸ 一時停止' : '▶ 再生'; };
+$('bRestart').onclick = restart;
+$('bEnd').onclick = () => { if (engine) { while (engine.advance(100000, 1000)); draw(); } };
+
+$('bSave').onclick = () => {
+	if (!result) return;
+	const a = document.createElement('a');
+	a.href = URL.createObjectURL(new Blob([result.text], { type: 'text/javascript' }));
+	a.download = 'picture_v3.js';
+	a.click();
+	setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('bCopy').onclick = async () => {
+	if (!result) return;
+	try { await navigator.clipboard.writeText(result.text); } catch { $('out').select(); document.execCommand('copy'); }
+	$('status').textContent = 'コピーしました';
+};
+
+function loadFile(f) {
+	if (!f || !f.type.startsWith('image/')) return;
+	const img = new Image();
+	img.onload = () => { srcImg = img; schedule(); };
+	img.src = URL.createObjectURL(f);
+}
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+$('file').onchange = e => loadFile(e.target.files[0]);
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>
