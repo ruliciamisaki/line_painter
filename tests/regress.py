@@ -1,6 +1,6 @@
-"""ラインペイント変換 V3 の回帰テスト。
+"""ラインペイント変換 の回帰テスト。
 
-Chromium 上で lp_converter_v3.html を実際に動かし、設定の組み合わせを流して次を確かめる
+Chromium 上で lp_converter.html を実際に動かし、設定の組み合わせを流して次を確かめる
 （1 つでも外れれば終了コード 1）。
   - ページでエラーが出ない
   - 検証のずれが 0（保存する文字列を読み直してエンジンで描いた結果が、完成の絵と一致）
@@ -15,8 +15,8 @@ Chromium 上で lp_converter_v3.html を実際に動かし、設定の組み合�
 使い方:
   pip install playwright
   python -m playwright install chromium
-  python tests/regress_v3.py
-結果の画像は tests/out_v3/ に保存される。
+  python tests/regress.py
+結果の画像は tests/out/ に保存される。
 """
 import asyncio
 import json
@@ -28,7 +28,7 @@ from playwright.async_api import async_playwright
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 IMG = HERE / 'images'
-OUT = HERE / 'out_v3'
+OUT = HERE / 'out'
 
 ALL = [0, 1, 2, 3, 4, 5, 6, 7]
 # (名前, 画像, 解像度, パレット, 使う色, 追加の設定(JS), 容量KB(0=なし), 減色のみとの差の上限)
@@ -158,7 +158,7 @@ async def main():
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.on('console', lambda m: errors.append(m.text) if m.type == 'error' else None)
-        await page.goto((ROOT / 'lp_converter_v3.html').as_uri())
+        await page.goto((ROOT / 'lp_converter.html').as_uri())
         # 開いた直後の欄の初期値（空文字だと 0 = 黒と読まれてしまう）
         init = await page.evaluate("[$('clearColor').value, $('lcolor').value]")
         if init != ['-1', '-1']:

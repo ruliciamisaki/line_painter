@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ラインペイント変換 V3</title>
+<title>ラインペイント変換</title>
 <style>
 	:root {
 		--bg: #15161b; --panel: #1e2027; --line: #30333d; --text: #e4e6ec; --dim: #8b90a0;
@@ -62,7 +62,7 @@
 </head>
 <body>
 <header>
-	<h1>ラインペイント変換 V3</h1>
+	<h1>ラインペイント変換</h1>
 	<span>線を引く → ベタ塗り → タイル塗り → 線の引き直し</span>
 </header>
 <main>
@@ -222,7 +222,7 @@
 	<table class="stats" id="stats"></table>
 
 	<div class="controls" style="margin-top:14px">
-		<button class="primary" id="bSave">picture_v3.js を保存</button>
+		<button class="primary" id="bSave">picture.js を保存</button>
 		<button id="bCopy">データをコピー</button>
 		<button id="bGif">GIF アニメで保存</button>
 		<span>GIF の大きさ</span>
@@ -237,9 +237,9 @@
 </section>
 </main>
 
-<script src="lp_engine_v3.js"></script>
-<script src="lp_convert_v3.js"></script>
-<script src="lp_gif_v3.js"></script>
+<script src="lp_engine.js"></script>
+<script src="lp_convert.js"></script>
+<script src="lp_gif.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -485,7 +485,7 @@ $('bSave').onclick = () => {
 	if (!result) return;
 	const a = document.createElement('a');
 	a.href = URL.createObjectURL(new Blob([result.text], { type: 'text/javascript' }));
-	a.download = 'picture_v3.js';
+	a.download = 'picture.js';
 	a.click();
 	setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
@@ -505,7 +505,7 @@ $('bGif').onclick = async () => {
 		});
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(new Blob([bytes], { type: 'image/gif' }));
-		a.download = 'picture_v3.gif';
+		a.download = 'picture.gif';
 		a.click();
 		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 		const w = pic.width * zoom, h = pic.height * Math.round(pic.pixelAspect || 1) * zoom;

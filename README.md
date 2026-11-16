@@ -36,7 +36,7 @@
 
 ### 1. 変換画面を開く
 
-`lp_converter_v3.html` をブラウザ（Chrome・Edge・Firefox など）で開きます。
+`lp_converter.html` をブラウザ（Chrome・Edge・Firefox など）で開きます。
 
 ![変換画面](docs/images/converter.png)
 
@@ -99,15 +99,15 @@
 
 | ボタン | 内容 |
 |---|---|
-| picture_v3.js を保存 | 絵データを `picture_v3.js` として保存します |
+| picture.js を保存 | 絵データを `picture.js` として保存します |
 | データをコピー | 絵データをクリップボードにコピーします |
-| GIF アニメで保存 | 描いていく様子を `picture_v3.gif` として保存します。速さは再生欄の「速さ」に従います。「GIF の大きさ」「コマ」（1 秒あたりのコマ数）も選べます |
+| GIF アニメで保存 | 描いていく様子を `picture.gif` として保存します。速さは再生欄の「速さ」に従います。「GIF の大きさ」「コマ」（1 秒あたりのコマ数）も選べます |
 
 640×200 の絵は、GIF では縦を 2 倍にして、見た目どおりの 640×400 で出します。
 
 ### 7. 再生する
 
-保存した `picture_v3.js` を `lp_player_v3.html` と同じフォルダに置き、`lp_player_v3.html` を開くと再生します。ほかの絵データは「別の絵」から選べます。
+保存した `picture.js` を `lp_player.html` と同じフォルダに置き、`lp_player.html` を開くと再生します。ほかの絵データは「別の絵」から選べます。
 
 再生画面では、速さ・拡大と、見せ方（絵データの指定どおり / 通常 / デジタルパレット）を選べます。速さ「×1」は、元の `main.js` と同じ拍子です（線は毎秒 600 本、塗りは毎秒およそ 750 本の走査線）。
 
@@ -119,13 +119,13 @@
 
 | ファイル | 役目 |
 |---|---|
-| `lp_converter_v3.html` | 変換画面 |
-| `lp_convert_v3.js` | 変換処理（`LP3.convert`） |
-| `lp_engine_v3.js` | 描画エンジン（`LP3.Engine`）。通常とデジタルパレットの 2 つの見せ方を持つ |
-| `lp_gif_v3.js` | 描画の様子を GIF アニメにする（`LP3.makeGif`） |
-| `lp_player_v3.html` | 再生画面。同じフォルダの `picture_v3.js` を読む |
-| `picture_v3.js` | 絵データ（見本） |
-| `tests/regress_v3.py` | 回帰テスト（Python + Playwright） |
+| `lp_converter.html` | 変換画面 |
+| `lp_convert.js` | 変換処理（`LP3.convert`） |
+| `lp_engine.js` | 描画エンジン（`LP3.Engine`）。通常とデジタルパレットの 2 つの見せ方を持つ |
+| `lp_gif.js` | 描画の様子を GIF アニメにする（`LP3.makeGif`） |
+| `lp_player.html` | 再生画面。同じフォルダの `picture.js` を読む |
+| `picture.js` | 絵データ（見本） |
+| `tests/regress.py` | 回帰テスト（Python + Playwright） |
 | `tests/images/main_js.png`、`photo.png` | テスト用の画像（前者は元の `main.js` が描いた絵を canvas から取り出したもの） |
 | `docs/images/` | この説明書の図 |
 
@@ -208,7 +208,7 @@ PC-8801 のカラーパレットの切り替えを使った描き方の再現で
 
 ## GIF アニメ
 
-変換画面の「GIF アニメで保存」で、描画の様子を GIF アニメ（`picture_v3.gif`）にして保存します。
+変換画面の「GIF アニメで保存」で、描画の様子を GIF アニメ（`picture.gif`）にして保存します。
 
 - 速さは、再生欄の「速さ」に従います。見せ方（通常／デジタルパレットと見せ色）は、絵データの指定どおりです。
 - 「GIF の大きさ」の自動は、横 320 ドット未満の絵（160×144 など）を 2 倍、それ以外を等倍にします。縦長ドット（640×200）は縦を 2 倍にして、見た目どおりの縦横比（640×400）で出します。
@@ -216,7 +216,7 @@ PC-8801 のカラーパレットの切り替えを使った描き方の再現で
 - 描き終えた絵を 2 秒見せてから、最初に戻って繰り返します。
 - 前のコマから変わった部分だけを書き出すので、見本の絵（×1、20 コマ/秒）で約 51KB、作成は 0.3 秒ほどです。デジタルパレットは色番号を切り替えるたびに画面全体の色が変わるので、大きくなります（同じ絵で約 280KB）。
 
-`LP3.makeGif(絵データ, { speed, fps, zoom, mode, palColors, holdSec, loop, onProgress })` は `lp_gif_v3.js` にあり、GIF の中身（`Uint8Array`）を返します。外部のライブラリは使っていません。
+`LP3.makeGif(絵データ, { speed, fps, zoom, mode, palColors, holdSec, loop, onProgress })` は `lp_gif.js` にあり、GIF の中身（`Uint8Array`）を返します。外部のライブラリは使っていません。
 
 ## 設定
 
@@ -292,7 +292,7 @@ window.LP_PICTURE = {
 ```
 pip install playwright
 python -m playwright install chromium
-python tests/regress_v3.py
+python tests/regress.py
 ```
 
 設定の組み合わせ 36 通りを実際にブラウザで流し、検証のずれが 0 か、選んだ色だけで描いているか、容量の上限を守っているか、減色のみとの差が上限以内か、を確かめます。「減色のみ」を完成形にする設定では差が厳密に 0 であること、デジタルパレットでは通常と最終の画面が同じで、描いている間は選んだ 2 つの見せ色しか見せないことも確かめます。現行版は 36 件すべて合格です。

@@ -1,4 +1,4 @@
-// lp_convert_v3.js — 画像 → ラインペイント絵データ変換 V3
+// lp_convert.js — 画像 → ラインペイント絵データ変換
 //
 // 絵を、昔のお絵かきと同じ 4 つの工程の命令列にする。
 //   1. 線を引く       … 絵全体の輪郭を線画として引く（主線＋色の境目）
@@ -1616,6 +1616,6 @@
 			flush();
 		}
 		s += ',\n\t"ops": [\n' + out.map(op => '\t\t' + op).join(',\n') + '\n\t]\n}';
-		return '// ラインペイント絵データ V3（lp_player_v3.html 用）\nwindow.LP_PICTURE = ' + s + ';\n';
+		return '// ラインペイント絵データ（lp_player.html 用）\nwindow.LP_PICTURE = ' + s + ';\n';
 	};
 })(typeof window !== 'undefined' ? window : globalThis);

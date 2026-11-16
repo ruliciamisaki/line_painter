@@ -1,4 +1,4 @@
-// lp_engine_v3.js — ラインペイント描画エンジン V3
+// lp_engine.js — ラインペイント描画エンジン
 //
 // 絵データ（LP_PICTURE）:
 // {

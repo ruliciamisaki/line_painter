@@ -1,4 +1,4 @@
-// lp_gif_v3.js — 描画の様子を GIF アニメにする（lp_engine_v3.js の後に読み込む）
+// lp_gif.js — 描画の様子を GIF アニメにする（lp_engine.js の後に読み込む）
 //
 //   const bytes = await LP3.makeGif(絵データ, {
 //     speed: 1,          // 再生の速さ（1 = 元の main.js の速さ）

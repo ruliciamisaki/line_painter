@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ラインペイント再生 V3</title>
+<title>ラインペイント再生</title>
 <style>
 	body { background: #f0f0f0; color: #222; text-align: center; margin: 0; padding: 20px 12px; font-family: "BIZ UDPGothic", "Yu Gothic UI", sans-serif; }
 	h1 { font-size: 20px; margin: 0 0 12px; }
@@ -42,13 +42,13 @@
 	</div>
 	<div id="msg"></div>
 
-	<script src="lp_engine_v3.js"></script>
-	<script src="picture_v3.js"></script>
+	<script src="lp_engine.js"></script>
+	<script src="picture.js"></script>
 	<script>
 	'use strict';
 	const $ = id => document.getElementById(id), cv = $('cv');
 	let pic = window.LP_PICTURE || null, eng = null, playing = true, lastT = 0;
-	if (!pic) $('msg').textContent = 'picture_v3.js が見つかりません。「別の絵」から絵データを選んでください。';
+	if (!pic) $('msg').textContent = 'picture.js が見つかりません。「別の絵」から絵データを選んでください。';
 
 	function restart() {
 		if (!pic) return;
