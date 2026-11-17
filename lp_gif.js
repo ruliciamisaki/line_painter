@@ -1,7 +1,7 @@
 // lp_gif.js — 描画の様子を GIF アニメにする（lp_engine.js の後に読み込む）
 //
 //   const bytes = await LP3.makeGif(絵データ, {
-//     speed: 1,          // 再生の速さ（1 = 元の main.js の速さ）
+//     speed: 1,          // 再生の速さ（1 = 標準の速さ）
 //     fps: 20,           // 1 秒あたりのコマ数（100 を割り切れる数がよい: 10, 20, 25, 50）
 //     zoom: 1,           // 拡大率。縦長ドット（pixelAspect 2）は縦を 2 倍にして、見た目どおりの縦横比にする
 //     mode, palColors,   // 見せ方（省略すると絵データの指定どおり）。LP3.Engine と同じ

@@ -14,6 +14,13 @@
 	.steps span { padding: 3px 10px; border: 1px solid #bbb; border-radius: 999px; color: #777; font-size: 13px; }
 	.steps span.on { color: #fff; background: #2f6fd0; border-color: #2f6fd0; font-weight: bold; }
 	#msg { color: #a33; }
+	#palBox { display: flex; gap: 18px; justify-content: center; align-items: center; flex-wrap: wrap; margin: 4px 0 8px; font-size: 14px; }
+	#palBox[hidden] { display: none; }
+	.palpick { display: flex; gap: 6px; align-items: center; }
+	.swatches { display: flex; gap: 4px; }
+	.swatches i { width: 22px; height: 18px; border: 1px solid #0006; border-radius: 3px; display: block; cursor: pointer; outline-offset: 1px; }
+	.swatches i.on { outline: 2px solid #2f6fd0; }
+	#palWarn { color: #a33; }
 </style>
 </head>
 <body>
@@ -28,7 +35,7 @@
 		<span>速さ</span>
 		<select id="speed">
 			<option value="0.25">×0.25</option><option value="0.5">×0.5</option>
-			<option value="1" selected>×1（元の速さ）</option>
+			<option value="1" selected>×1（標準）</option>
 			<option value="2">×2</option><option value="4">×4</option><option value="8">×8</option><option value="16">×16</option>
 		</select>
 		<span>拡大</span><select id="zoom"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
@@ -40,6 +47,12 @@
 		</select>
 		<label>別の絵: <input type="file" id="file" accept=".js,.json"></label>
 	</div>
+	<div id="palBox" hidden>
+		<div class="palpick">描いている色<div class="swatches" id="palDraw"></div></div>
+		<div class="palpick">それ以外の色<div class="swatches" id="palHide"></div></div>
+		<button id="bPalReset" title="絵データに入っている見せ色に戻す">絵データの色に戻す</button>
+		<span id="palWarn" hidden>2 色が同じなので、描いている間は何も見えません</span>
+	</div>
 	<div id="msg"></div>
 
 	<script src="lp_engine.js"></script>
@@ -48,11 +61,24 @@
 	'use strict';
 	const $ = id => document.getElementById(id), cv = $('cv');
 	let pic = window.LP_PICTURE || null, eng = null, playing = true, lastT = 0;
+	// デジタルパレットの見せ色（PC-8801 のデジタル 8 色から 2 色）。最初は絵データの指定（なければ青と黒）
+	let palColors = null;
+	const picPalColors = () => (pic && pic.palColors ? pic.palColors : LP3.PAL_DEFAULT).map(c => c.toLowerCase());
+	function refreshPalPick() {
+		const mode = $('mode').value || (pic && pic.drawMode === 'palette' ? 'palette' : 'normal');
+		$('palBox').hidden = mode !== 'palette';
+		for (const [id, k] of [['palDraw', 0], ['palHide', 1]])
+			$(id).innerHTML = LP3.PAL_CHOICES.map(c => `<i data-c="${c}" class="${c === palColors[k] ? 'on' : ''}" title="${c}" style="background:${c}"></i>`).join('');
+		$('palWarn').hidden = palColors[0] !== palColors[1];
+		$('bPalReset').disabled = palColors.join() === picPalColors().join();
+	}
 	if (!pic) $('msg').textContent = 'picture.js が見つかりません。「別の絵」から絵データを選んでください。';
 
 	function restart() {
 		if (!pic) return;
-		eng = new LP3.Engine(pic, $('mode').value || undefined);
+		if (!palColors) palColors = picPalColors();
+		refreshPalPick();
+		eng = new LP3.Engine(pic, $('mode').value || undefined, palColors);
 		eng.start();
 		playing = true; lastT = 0;
 		$('bPlay').textContent = '一時停止';
@@ -73,9 +99,15 @@
 	$('bRestart').onclick = restart;
 	$('zoom').onchange = resize;
 	$('mode').onchange = restart;
+	for (const [id, k] of [['palDraw', 0], ['palHide', 1]])
+		$(id).addEventListener('click', e => {
+			const t = e.target.closest('i[data-c]'); if (!t || palColors[k] === t.dataset.c) return;
+			palColors[k] = t.dataset.c; restart();
+		});
+	$('bPalReset').onclick = () => { palColors = picPalColors(); restart(); };
 	$('file').onchange = async e => {
 		const f = e.target.files[0]; if (!f) return;
-		try { pic = LP3.parsePicture(await f.text()); $('msg').textContent = ''; restart(); }
+		try { pic = LP3.parsePicture(await f.text()); palColors = null; $('msg').textContent = ''; restart(); }
 		catch (err) { $('msg').textContent = '読み込めませんでした: ' + err.message; }
 	};
 	restart();

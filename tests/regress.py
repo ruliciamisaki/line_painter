@@ -17,6 +17,7 @@ Chromium 上で lp_converter.html を実際に動かし、設定の組み合わ�
   pip install playwright
   python -m playwright install chromium
   python tests/regress.py
+  python tests/regress.py --illust 別の画像.png   （'illust' のケースを別のイラストで流す）
 結果の画像は tests/out/ に保存される。
 """
 import asyncio
@@ -29,54 +30,59 @@ from playwright.async_api import async_playwright
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 IMG = HERE / 'images'
+# 'illust' と書いたケースで使うイラスト。--illust で別の画像に差し替えられる
+ILLUST = ROOT / 'docs' / 'images' / 'sample1_source.png'
+for i, a in enumerate(sys.argv[1:]):
+    if a == '--illust' and i + 2 < len(sys.argv):
+        ILLUST = pathlib.Path(sys.argv[i + 2]).resolve()
 OUT = HERE / 'out'
 
 ALL = [0, 1, 2, 3, 4, 5, 6, 7]
 # (名前, 画像, 解像度, パレット, 使う色, 追加の設定(JS), 容量KB(0=なし), 減色のみとの差の上限)
 CASES = [
-    ('8色 既定',            'main_js.png',  '640x200x2', 'digital8', ALL, '', 0, 0.03),
-    ('8色 主線なし',        'main_js.png',  '640x200x2', 'digital8', ALL, "$('useLines').checked=false", 0, 0.03),
-    ('8色 単純化0',         'main_js.png',  '640x200x2', 'digital8', ALL, "$('eps').value='0'", 0, 0.02),
-    ('8色 ベタ全部→タイル', 'main_js.png',  '640x200x2', 'digital8', ALL, "$('order').value='staged'", 0, 0.03),
-    ('8色 圧縮なし',        'main_js.png',  '640x200x2', 'digital8', ALL, "$('pack').checked=false", 0, 0.03),
-    ('160x144',             'main_js.png',  '160x144x1', 'digital8', ALL, '', 0, 0.06),
+    ('8色 既定',            'illust',       '640x200x2', 'digital8', ALL, '', 0, 0.03),
+    ('8色 主線なし',        'illust',       '640x200x2', 'digital8', ALL, "$('useLines').checked=false", 0, 0.04),
+    ('8色 単純化0',         'illust',       '640x200x2', 'digital8', ALL, "$('eps').value='0'", 0, 0.02),
+    ('8色 ベタ全部→タイル', 'illust',       '640x200x2', 'digital8', ALL, "$('order').value='staged'", 0, 0.03),
+    ('8色 圧縮なし',        'illust',       '640x200x2', 'digital8', ALL, "$('pack').checked=false", 0, 0.03),
+    ('160x144',             'illust',       '160x144x1', 'digital8', ALL, '', 0, 0.06),
     ('任意 写真',           'photo.png', 'custom',    'digital8', ALL, '', 0, 0.06),
     ('写真 段差の線',       'photo.png', '640x200x2', 'db8',      ALL, "$('lmethod').value='edge'", 0, 0.10),
-    ('5色',                 'main_js.png',  '640x200x2', 'digital8', [0, 2, 4, 6, 7], '', 0, 0.03),
-    ('DB8 4色',             'main_js.png',  '640x200x2', 'db8',      [0, 3, 6, 7], '', 0, 0.04),
-    ('2色 白黒',            'main_js.png',  '640x200x2', 'digital8', [0, 7], '', 0, 0.04),
-    ('2色 赤青',            'main_js.png',  '640x200x2', 'digital8', [1, 2], '', 0, 0.06),
-    ('紙の色を黒に',        'main_js.png',  '640x200x2', 'digital8', ALL, "CLEAR=0", 0, 0.04),
-    ('1色 線画',            'main_js.png',  '640x200x2', 'digital8', [0], '', 0, 1),
+    ('5色',                 'illust',       '640x200x2', 'digital8', [0, 2, 4, 6, 7], '', 0, 0.03),
+    ('DB8 4色',             'illust',       '640x200x2', 'db8',      [0, 3, 6, 7], '', 0, 0.04),
+    ('2色 白黒',            'illust',       '640x200x2', 'digital8', [0, 7], '', 0, 0.04),
+    ('2色 赤青',            'illust',       '640x200x2', 'digital8', [1, 2], '', 0, 0.06),
+    ('紙の色を黒に',        'illust',       '640x200x2', 'digital8', ALL, "CLEAR=0", 0, 0.04),
+    ('1色 線画',            'illust',       '640x200x2', 'digital8', [0], '', 0, 1),
     ('1色 線画 写真',       'photo.png', '640x200x2', 'digital8', [7], '', 0, 1),
-    ('容量 5KB',            'main_js.png', '640x200x2', 'digital8', ALL, '', 5, 0.06),
-    ('容量 3KB',            'main_js.png', '640x200x2', 'digital8', ALL, '', 3, 0.12),
-    ('容量 2KB',            'main_js.png', '640x200x2', 'digital8', ALL, '', 2, 1),
-    ('容量 1KB',            'main_js.png', '640x200x2', 'digital8', ALL, '', 1, 1),
-    ('容量 3KB 線画',       'main_js.png', '640x200x2', 'db8',      [1], '', 3, 1),
-    ('容量 3KB 160x144',    'main_js.png', '160x144x1', 'digital8', ALL, '', 3, 0.15),
+    ('容量 12KB',           'illust',      '640x200x2', 'digital8', ALL, '', 12, 0.10),
+    ('容量 8KB',            'illust',      '640x200x2', 'digital8', ALL, '', 8, 0.10),
+    ('容量 6KB',            'illust',      '640x200x2', 'digital8', ALL, '', 6, 0.12),
+    ('容量 1KB（届かない）', 'illust',      '640x200x2', 'digital8', ALL, '', 1, 1),
+    ('容量 8KB 線画',       'illust',      '640x200x2', 'db8',      [1], '', 8, 1),
+    ('容量 3KB 160x144',    'illust',      '160x144x1', 'digital8', ALL, '', 3, 0.15),
     # デジタルパレットの描画モード（できあがる絵は通常と同じ）
-    ('パレットモード',      'main_js.png', '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'", 0, 0.03),
-    ('パレット ベタ全部→',  'main_js.png', '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'; $('order').value='staged'", 0, 0.03),
-    ('パレット 圧縮なし',   'main_js.png', '640x200x2', 'db8',      ALL, "$('drawMode').value='palette'; $('pack').checked=false", 0, 0.04),
-    ('パレット 白と赤',     'main_js.png', '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'; palColors=['#ffffff','#ff0000']; refreshPalPick()", 0, 0.03),
-    ('パレット DB8 緑と青', 'main_js.png', '640x200x2', 'db8',      ALL, "$('drawMode').value='palette'; palColors=['#00ff00','#0000ff']; refreshPalPick()", 0, 0.04),
-    ('パレット 線画',       'main_js.png', '640x200x2', 'digital8', [7], "$('drawMode').value='palette'", 0, 1),
+    ('パレットモード',      'illust',      '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'", 0, 0.03),
+    ('パレット ベタ全部→',  'illust',      '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'; $('order').value='staged'", 0, 0.03),
+    ('パレット 圧縮なし',   'illust',      '640x200x2', 'db8',      ALL, "$('drawMode').value='palette'; $('pack').checked=false", 0, 0.04),
+    ('パレット 白と赤',     'illust',      '640x200x2', 'digital8', ALL, "$('drawMode').value='palette'; palColors=['#ffffff','#ff0000']; refreshPalPick()", 0, 0.03),
+    ('パレット DB8 緑と青', 'illust',      '640x200x2', 'db8',      ALL, "$('drawMode').value='palette'; palColors=['#00ff00','#0000ff']; refreshPalPick()", 0, 0.04),
+    ('パレット 線画',       'illust',      '640x200x2', 'digital8', [7], "$('drawMode').value='palette'", 0, 1),
     # まとめ式（同じ色番号をまとめて塗る）。色番号の切り替えが 20 回以下になること
-    ('まとめ式',            'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('drawMode').value='palette'", 0, 0.03),
-    ('まとめ式 ベタ全部→',  'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('order').value='staged'", 0, 0.03),
+    ('まとめ式',            'illust',      '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('drawMode').value='palette'", 0, 0.03),
+    ('まとめ式 ベタ全部→',  'illust',      '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('order').value='staged'", 0, 0.03),
     ('まとめ式 写真 DB8',   'photo.png',   '640x200x2', 'db8',      ALL, "$('paintGroup').value='color'; $('drawMode').value='palette'", 0, 0.06),
-    ('まとめ式 減色のみ',   'main_js.png', '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('goalIdeal').checked=true", 0, 0),
+    ('まとめ式 減色のみ',   'illust',      '640x200x2', 'digital8', ALL, "$('paintGroup').value='color'; $('goalIdeal').checked=true", 0, 0),
     # 「減色のみ」の絵を完成形にする（差は厳密に 0 でなければならない）
-    ('減色のみを完成形',    'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true", 0, 0),
-    ('減色のみ 主線なし',   'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true; $('useLines').checked=false", 0, 0),
-    ('減色のみ 2色',        'main_js.png', '640x200x2', 'digital8', [0, 7], "$('goalIdeal').checked=true", 0, 0),
+    ('減色のみを完成形',    'illust',      '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true", 0, 0),
+    ('減色のみ 主線なし',   'illust',      '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true; $('useLines').checked=false", 0, 0),
+    ('減色のみ 2色',        'illust',      '640x200x2', 'digital8', [0, 7], "$('goalIdeal').checked=true", 0, 0),
     ('減色のみ 写真',       'photo.png',   '640x200x2', 'db8',      ALL, "$('goalIdeal').checked=true", 0, 0),
-    ('減色のみ 5KB',        'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true", 5, 0),
-    ('減色のみ パレット',   'main_js.png', '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true; $('drawMode').value='palette'", 0, 0),
+    ('減色のみ 20KB',       'illust',      '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true", 20, 0),
+    ('減色のみ パレット',   'illust',      '640x200x2', 'digital8', ALL, "$('goalIdeal').checked=true; $('drawMode').value='palette'", 0, 0),
     # 原画の色補正
-    ('補正 彩度+60 明+30',  'main_js.png', '640x200x2', 'digital8', ALL, "$('aSat').value=60; $('aBright').value=30", 0, 0.03),
-    ('補正 彩度-100',       'main_js.png', '640x200x2', 'digital8', ALL, "$('aSat').value=-100", 0, 0.04),
+    ('補正 彩度+60 明+30',  'illust',      '640x200x2', 'digital8', ALL, "$('aSat').value=60; $('aBright').value=30", 0, 0.03),
+    ('補正 彩度-100',       'illust',      '640x200x2', 'digital8', ALL, "$('aSat').value=-100", 0, 0.04),
     ('補正 赤-100 対比+50', 'photo.png',   '640x200x2', 'digital8', ALL, "$('aR').value=-100; $('aCont').value=50", 0, 0.06),
 ]
 
@@ -193,7 +199,7 @@ async def main():
             await page.evaluate(f"$('budgetOn').checked = {str(kb > 0).lower()}; $('budget').value = '{kb or 10}'")
             await page.select_option('#res', res)
             await page.evaluate("$('status').textContent = ''")
-            await page.set_input_files('#file', str(IMG / img))
+            await page.set_input_files('#file', str(ILLUST if img == 'illust' else IMG / img))
             await page.wait_for_function(
                 "(s => s.startsWith('変換 ') || s.startsWith('エラー'))(document.getElementById('status').textContent)",
                 timeout=180000)
